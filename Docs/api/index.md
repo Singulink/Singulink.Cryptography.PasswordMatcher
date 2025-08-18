@@ -1,3 +1,3 @@
-# Singulink.Globalization.Currency
+# Singulink.Cryptography.PasswordChecker
 
-Use the table of contents to browse API documentation for the **Singulink.Globalization.Currency** library.
+Use the table of contents to browse API documentation for the **Singulink.Cryptography.PasswordChecker** library.

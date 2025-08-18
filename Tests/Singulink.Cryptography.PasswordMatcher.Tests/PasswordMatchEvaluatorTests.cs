@@ -1,14 +1,14 @@
 namespace Singulink.Cryptography.Tests;
 
 [PrefixTestClass]
-public sealed class PasswordCheckerTests
+public sealed class PasswordMatchEvaluatorTests
 {
     [TestMethod]
     public void Subject_Verb_Subject_Suffix_IsMatch()
     {
         string password = "iloveyou!!";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["i", "love", "you", "!!"]);
@@ -19,7 +19,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "QWERTp@ssword1975";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["QWERT", "password", "1975"]);
@@ -30,7 +30,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "s1ngul1nkisthebest";
 
-        var result = PasswordChecker.Default.CheckPassword(password, [new("Singulink Business Solutions", ContextualSubjectType.Company)]);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, [new("Singulink Business Solutions", ContextualSubjectType.Company)]);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["singulink", "is", "the", "best"]);
@@ -41,7 +41,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "s1ngul1nkmikem111!!";
 
-        var result = PasswordChecker.Default.CheckPassword(password, [new("mikem@singulink.com", ContextualSubjectType.Email)]);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, [new("mikem@singulink.com", ContextualSubjectType.Email)]);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["singulink", "mikem", "111", "!!"]);
@@ -52,7 +52,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "password.123123.123123";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["password", "123", "123", "123", "123"]);
@@ -63,7 +63,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "password123IOP{}|";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["password", "123", "IOP{}|"]);
@@ -74,7 +74,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "PasswordPassword PasswordPassword";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["password", "password", "password", "password"]);
@@ -85,7 +85,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "this is a bad password";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["this", "is", "a", "bad", "password"]);
@@ -96,7 +96,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "the.bad.admin";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["the", "bad", "admin"]);
@@ -107,7 +107,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "IAmABad@dmin";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["i", "am", "a", "bad", "admin"]);
@@ -118,7 +118,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "iamthebusinessadmin";
 
-        var result = PasswordChecker.Default.CheckPassword(password, [new("Singulink Business Solutions", ContextualSubjectType.Company)]);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, [new("Singulink Business Solutions", ContextualSubjectType.Company)]);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["i", "am", "the", "business", "admin"]);
@@ -129,7 +129,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "MikeMikeLogInToSingulinkSingulink1!";
 
-        var result = PasswordChecker.Default.CheckPassword(password, [
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, [
             new("https://www.singulink.com", ContextualSubjectType.Website),
             new("Mike Smith", ContextualSubjectType.Name)
         ]);
@@ -143,7 +143,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "LogInToSingulinkSingulinkMikeMike hgfds";
 
-        var result = PasswordChecker.Default.CheckPassword(password, [
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, [
             new("https://www.singulink.com", ContextualSubjectType.Website),
             new("Mike Smith", ContextualSubjectType.Name)
         ]);
@@ -157,7 +157,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "you are a noob";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["you", "are", "a", "noob"]);
@@ -168,7 +168,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "you are a bad noob";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["you", "are", "a", "bad", "noob"]);
@@ -179,7 +179,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "welcometoadmin";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["welcome", "to", "admin"]);
@@ -190,7 +190,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "letmeinadmin";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["let", "me", "in", "admin"]);
@@ -201,7 +201,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "letmeintoadmin";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["let", "me", "into", "admin"]);
@@ -212,7 +212,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "coolninja";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["cool", "ninja"]);
@@ -223,7 +223,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "coolasninja";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["cool", "as", "ninja"]);
@@ -234,7 +234,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "coolasaninja";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["cool", "as", "a", "ninja"]);
@@ -245,7 +245,7 @@ public sealed class PasswordCheckerTests
     {
         string password = "iamcoolasaninja";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeTrue();
         result.MatchedValues.ShouldBe(["i", "am", "cool", "as", "a", "ninja"]);
@@ -256,7 +256,7 @@ public sealed class PasswordCheckerTests
     {
         string password = @"1234asdfqwerzxcvadmin";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
         result.Matched.ShouldBeTrue();
     }
 
@@ -265,7 +265,7 @@ public sealed class PasswordCheckerTests
     {
         string password = @"1234567890-=qwertyuiop[]\asdfghjkl;'zxcvbnm,./memememe1234567890";
 
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
         result.Matched.ShouldBeTrue();
     }
 
@@ -273,26 +273,26 @@ public sealed class PasswordCheckerTests
     public void NoMatches()
     {
         string password = "thisisnotamatch";
-        var result = PasswordChecker.Default.CheckPassword(password, null);
+        var result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeFalse();
         result.MatchedValues.ShouldBeEmpty();
 
         password = "passwordk4efjawei";
 
-        result = PasswordChecker.Default.CheckPassword(password, null);
+        result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
 
         result.Matched.ShouldBeFalse();
         result.MatchedValues.ShouldBeEmpty();
 
         password = "9092394850923029384";
 
-        result = PasswordChecker.Default.CheckPassword(password, null);
+        result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
         result.Matched.ShouldBeFalse();
 
         password = "hello world!!";
 
-        result = PasswordChecker.Default.CheckPassword(password, null);
+        result = PasswordMatchEvaluator.Default.MatchPassword(password, null);
         result.Matched.ShouldBeFalse();
     }
 }

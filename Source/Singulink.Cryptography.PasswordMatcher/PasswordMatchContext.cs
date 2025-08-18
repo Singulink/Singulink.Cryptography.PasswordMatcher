@@ -71,6 +71,6 @@ public sealed record PasswordMatchContext
 
     public override string ToString()
     {
-        return $@"Remaining: ""{RemainingChars.ToString()}""({RemainingChars.Length} chars), LastMatched: {LastMatchItem}, TotalMatched: {TotalMatchedLength}";
+        return $"Remaining: \"{RemainingChars.ToString()}\" ({RemainingChars.Length} chars), LastMatched: {LastMatchItem}, TotalMatched: {TotalMatchedLength}";
     }
 }

@@ -75,7 +75,7 @@ public static class CommonMatchers
     ]);
 
     public static PasswordMatcher GeneralSubjectMatcher { get; } = Any([
-        Text("i", checkSubstitutions: false),
+        Text("i"),
         Text("me"),
         Text("you"),
         Text("this"),

@@ -2,19 +2,26 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
   <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>preview</LangVersion>
+    <AnalysisLevel>latest-Recommended</AnalysisLevel>
+
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\key.snk</AssemblyOriginatorKeyFile>
+
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+
     <Authors>Singulink</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Copyright>© Singulink. All rights reserved.</Copyright>
     <PackageIcon>Singulink Icon 128x128.png</PackageIcon>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <LangVersion>preview</LangVersion>
-    <SignAssembly>true</SignAssembly>
-
-    <AssemblyOriginatorKeyFile>..\key.snk</AssemblyOriginatorKeyFile>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-
-    <AnalysisLevel>latest-Recommended</AnalysisLevel>
+    <PackageProjectUrl>https://github.com/Singulink/Singulink.Cryptography.PasswordChecker</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Link="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <PropertyGroup Label="AOT Compatibility" Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net6.0'))">
     <IsAotCompatible>true</IsAotCompatible>

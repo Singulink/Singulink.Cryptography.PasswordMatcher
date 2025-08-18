@@ -19,5 +19,5 @@ public record PasswordMatchItem
         MatchType = matchType;
     }
 
-    public override string ToString() => $@"""{MatchedText}"" ({MatchType})";
+    public override string ToString() => $"\"{MatchedText}\" ({MatchType})";
 }

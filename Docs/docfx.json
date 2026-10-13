@@ -7,7 +7,7 @@
       "src": [
         {
           "files": [
-            "Singulink.Cryptography.PasswordChecker/Singulink.Cryptography.PasswordChecker.csproj"
+            "Singulink.Cryptography.PasswordMatcher/Singulink.Cryptography.PasswordMatcher.csproj"
           ],
           "src": "../Source"
         }
@@ -22,8 +22,8 @@
   ],
   "build": {
     "globalMetadata": {
-      "_appTitle": "Singulink.Cryptography.PasswordChecker",
-      "_appName": "Password Checker",
+      "_appTitle": "Singulink.Cryptography.PasswordMatcher",
+      "_appName": "Password Matcher",
       "_appLogoPath": "images/logo.png",
       "_appFaviconPath": "images/favicon.png",
       "_copyrightFooter": "© Singulink. All rights reserved.",

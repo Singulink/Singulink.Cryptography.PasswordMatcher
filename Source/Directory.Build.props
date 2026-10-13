@@ -15,7 +15,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Copyright>© Singulink. All rights reserved.</Copyright>
     <PackageIcon>Singulink Icon 128x128.png</PackageIcon>
-    <PackageProjectUrl>https://github.com/Singulink/Singulink.Cryptography.PasswordChecker</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/Singulink/Singulink.Cryptography.PasswordMatcher</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 

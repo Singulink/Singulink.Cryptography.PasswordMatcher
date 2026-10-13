@@ -1,57 +1,119 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Singulink.Cryptography.PasswordMatchers;
 
+/// <summary>
+/// Base class for matchers that consume text from the password, with optional support for matching consecutive repeats of the value and a
+/// trailing separator character.
+/// </summary>
+/// <remarks>
+/// <para>Derived classes implement <see cref="GetValueMatches(PasswordMatchContext)"/> to match the value itself. Repeats and separators are
+/// handled by this class: after each value match, the exact characters that were matched may be matched again any number of times, and a single
+/// separator character (space, period, dash, underscore or comma) may follow each occurrence.</para>
+/// </remarks>
 public abstract class ValueMatcher : PasswordMatcher
 {
-    private static readonly ImmutableArray<char> Separators = [' ', '.'];
+    /// <summary>
+    /// Gets the characters that are matched as separators after a value when <see cref="MatchTrailingSeparator"/> is <see langword="true"/>.
+    /// </summary>
+    public static ImmutableArray<char> Separators { get; } = [' ', '.', '-', '_', ','];
 
+    /// <summary>
+    /// Gets a value indicating whether a single separator character after the value is also matched.
+    /// </summary>
     public bool MatchTrailingSeparator { get; }
 
     /// <summary>
-    /// Gets a value indicating whether repeated values are matched.
+    /// Gets a value indicating whether consecutive repeats of the matched value are also matched.
     /// </summary>
     public bool MatchRepeats { get; }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ValueMatcher"/> class.
+    /// </summary>
+    /// <param name="matchRepeats">Whether consecutive repeats of the matched value are also matched.</param>
+    /// <param name="matchTrailingSeparator">Whether a single separator character after the value is also matched.</param>
     protected ValueMatcher(bool matchRepeats, bool matchTrailingSeparator)
     {
         MatchRepeats = matchRepeats;
         MatchTrailingSeparator = matchTrailingSeparator;
     }
 
-    protected internal sealed override IEnumerable<PasswordMatchContext> GetMatches(PasswordMatchContext context)
+    /// <inheritdoc/>
+    protected sealed override IEnumerable<PasswordMatchContext> GetMatchesCore(PasswordMatchContext context)
     {
         foreach (var childContext in GetValueMatches(context))
         {
             yield return childContext;
 
-            RepeatValueMatcher repeatValueMatcher = null;
+            int valueLength = childContext.TotalMatchedLength - context.TotalMatchedLength;
 
-            if (MatchRepeats)
+            if (!MatchRepeats || valueLength is 0)
             {
-                int repeatValueLength = childContext.TotalMatchedLength - context.TotalMatchedLength;
+                if (MatchTrailingSeparator && TryMatchSeparator(childContext, out var separatorContext))
+                    yield return separatorContext;
 
-                if (repeatValueLength > 0)
-                {
-                    string repeatValue = context.CheckedPassword.Substring(context.TotalMatchedLength, repeatValueLength);
-                    repeatValueMatcher = new(this, repeatValue, childContext.LastMatchItem?.MatchedText, MatchTrailingSeparator);
-
-                    foreach (var repeatContext in repeatValueMatcher.GetMatches(childContext))
-                        yield return repeatContext;
-                }
+                continue;
             }
 
-            if (MatchTrailingSeparator && childContext.RemainingChars is [char s, ..] && Separators.Contains(s))
-            {
-                var childContextWithSeparator = childContext.CreateChild(this, 1, null);
-                yield return childContextWithSeparator;
+            // Repeats of the exact characters that were matched, optionally joined by separators, form a tree of contexts: each occurrence
+            // can be followed directly by another occurrence, by a separator, or by a separator and another occurrence. Explore it depth-first
+            // with an explicit stack so that long chains do not nest iterators.
 
-                if (repeatValueMatcher is not null)
+            string repeatValue = context.CheckedPassword.Substring(context.TotalMatchedLength, valueLength);
+            var repeatItem = childContext.LastMatchItem is not null ? new PasswordMatchItem(childContext.LastMatchItem.MatchedText, PasswordMatchType.RepeatValue) : null;
+
+            var pending = new Stack<PasswordMatchContext>();
+            pending.Push(childContext);
+
+            while (pending.Count > 0)
+            {
+                var c = pending.Pop();
+                PasswordMatchContext? directRepeat = null;
+                PasswordMatchContext? separatedRepeat = null;
+
+                if (c.RemainingChars.StartsWith(repeatValue.AsSpan(), StringComparison.Ordinal))
                 {
-                    foreach (var repeatContext in repeatValueMatcher.GetValueMatches(childContextWithSeparator))
-                        yield return repeatContext;
+                    directRepeat = c.CreateChild(valueLength, repeatItem);
+                    yield return directRepeat;
                 }
+
+                if (MatchTrailingSeparator && TryMatchSeparator(c, out var separatorContext))
+                {
+                    yield return separatorContext;
+
+                    if (separatorContext.RemainingChars.StartsWith(repeatValue.AsSpan(), StringComparison.Ordinal))
+                    {
+                        separatedRepeat = separatorContext.CreateChild(valueLength, repeatItem);
+                        yield return separatedRepeat;
+                    }
+                }
+
+                if (separatedRepeat is not null)
+                    pending.Push(separatedRepeat);
+
+                if (directRepeat is not null)
+                    pending.Push(directRepeat);
             }
         }
     }
 
+    /// <summary>
+    /// Gets the contexts that result from matching the value at the current position of the given context, in the order they should be tried.
+    /// Repeats and trailing separators do not need to be handled by the implementation.
+    /// </summary>
+    /// <param name="context">The context to match against.</param>
     protected abstract IEnumerable<PasswordMatchContext> GetValueMatches(PasswordMatchContext context);
+
+    private static bool TryMatchSeparator(PasswordMatchContext context, [NotNullWhen(true)] out PasswordMatchContext? separatorContext)
+    {
+        if (context.RemainingChars is [char s, ..] && Separators.Contains(s))
+        {
+            separatorContext = context.CreateChild(1, null);
+            return true;
+        }
+
+        separatorContext = null;
+        return false;
+    }
 }

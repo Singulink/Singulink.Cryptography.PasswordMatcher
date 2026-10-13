@@ -1,70 +1,77 @@
 namespace Singulink.Cryptography.PasswordMatchers;
 
 /// <summary>
-/// Matcher that checks for all permutations of a set of matchers in any order.
+/// Matcher that matches a set of matchers in any order, with each matcher used at most once.
 /// </summary>
-public class PermutationsMatcher : PasswordMatcher
+public sealed class PermutationsMatcher : PasswordMatcher
 {
+    /// <summary>
+    /// The maximum number of matchers that can be permuted.
+    /// </summary>
+    public const int MaxMatchers = 31;
+
+    /// <summary>
+    /// Gets the matchers that are permuted.
+    /// </summary>
     public ImmutableArray<PasswordMatcher> Matchers { get; }
 
+    /// <summary>
+    /// Gets a value indicating whether every matcher must match for the permutation to match. If <see langword="false"/>, any non-empty subset
+    /// of the matchers can match.
+    /// </summary>
     public bool MustMatchAllMatchers { get; }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PermutationsMatcher"/> class.
+    /// </summary>
+    /// <param name="matchers">The matchers to permute. Each must be a distinct instance, and optional matchers are not permitted.</param>
+    /// <param name="mustMatchAllMatchers">Whether every matcher must match for the permutation to match.</param>
     public PermutationsMatcher(IEnumerable<PasswordMatcher> matchers, bool mustMatchAllMatchers)
     {
         Matchers = matchers.ToImmutableArray();
         MustMatchAllMatchers = mustMatchAllMatchers;
 
+        if (Matchers.Length > MaxMatchers)
+            throw new ArgumentException($"{nameof(PermutationsMatcher)} supports a maximum of {MaxMatchers} matchers.", nameof(matchers));
+
         if (Matchers.Distinct().Count() != Matchers.Length)
-            throw new ArgumentException($"{typeof(PermutationsMatcher).Name} cannot contain multiple instances of the same matcher.", nameof(matchers));
+            throw new ArgumentException($"{nameof(PermutationsMatcher)} cannot contain multiple instances of the same matcher.", nameof(matchers));
 
         if (Matchers.Any(m => m is OptionalMatcher))
-            throw new ArgumentException($"{typeof(PermutationsMatcher).Name} cannot directly contain optional matchers.", nameof(matchers));
+            throw new ArgumentException($"{nameof(PermutationsMatcher)} cannot directly contain optional matchers.", nameof(matchers));
     }
 
-    protected internal override IEnumerable<PasswordMatchContext> GetMatches(PasswordMatchContext context)
+    /// <inheritdoc/>
+    protected override IEnumerable<PasswordMatchContext> GetMatchesCore(PasswordMatchContext context)
     {
-        return MustMatchAllMatchers
-            ? GetMatchesAll(context, []).Distinct()
-            : GetMatchesAny(context, []).Distinct();
+        // Depth-first over (used matcher set, position) states. Revisiting a state can only produce end positions already produced.
+        var visited = new HashSet<(int UsedMask, int Position)>();
+        return GetMatches(context, 0, visited);
     }
 
-    private IEnumerable<PasswordMatchContext> GetMatchesAny(PasswordMatchContext context, PasswordMatcher[] usedMatchers)
+    private IEnumerable<PasswordMatchContext> GetMatches(PasswordMatchContext context, int usedMask, HashSet<(int UsedMask, int Position)> visited)
     {
-        foreach (var matcher in Matchers)
+        if (!visited.Add((usedMask, context.TotalMatchedLength)))
+            yield break;
+
+        int allMask = (1 << Matchers.Length) - 1;
+
+        for (int i = 0; i < Matchers.Length; i++)
         {
-            if (Array.IndexOf(usedMatchers, matcher) >= 0)
+            int bit = 1 << i;
+
+            if ((usedMask & bit) is not 0)
                 continue;
 
-            foreach (var match in matcher.GetMatches(context))
+            int newMask = usedMask | bit;
+
+            foreach (var match in Matchers[i].GetMatches(context))
             {
-                yield return match;
-
-                PasswordMatcher[] newUsedMatchers = [..usedMatchers, matcher];
-
-                foreach (var permutationMatches in GetMatchesAny(match, newUsedMatchers))
-                    yield return permutationMatches;
-            }
-        }
-    }
-
-    private IEnumerable<PasswordMatchContext> GetMatchesAll(PasswordMatchContext context, PasswordMatcher[] usedMatchers)
-    {
-        bool isLastMatcher = Matchers.Length == usedMatchers.Length + 1;
-
-        foreach (var matcher in Matchers)
-        {
-            if (Array.IndexOf(usedMatchers, matcher) >= 0)
-                continue;
-
-            foreach (var match in matcher.GetMatches(context))
-            {
-                if (isLastMatcher)
+                if (!MustMatchAllMatchers || newMask == allMask)
                     yield return match;
 
-                PasswordMatcher[] newUsedMatchers = [.. usedMatchers, matcher];
-
-                foreach (var permutationMatches in GetMatchesAll(match, newUsedMatchers))
-                    yield return permutationMatches;
+                foreach (var permutationMatch in GetMatches(match, newMask, visited))
+                    yield return permutationMatch;
             }
         }
     }

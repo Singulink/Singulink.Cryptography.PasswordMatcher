@@ -8,7 +8,7 @@ The factory methods cover words, sequences, alternatives, permutations, keyboard
 
 A matcher that consumes characters from the password derives from <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher>, which handles repeats and trailing separators so that the matcher only has to recognize its value. A matcher that composes other matchers derives from <xref:Singulink.Cryptography.PasswordMatcher> directly and calls <xref:Singulink.Cryptography.PasswordMatcher.GetMatches*> on its children. Both are immutable once constructed and can be shared freely.
 
-## The Match Context
+## Match Context
 
 Every matcher works with a <xref:Singulink.Cryptography.PasswordMatchContext>, which represents a position in the password together with the items matched so far. The members a matcher uses are:
 
@@ -26,7 +26,7 @@ Contexts are immutable. A matcher never advances a context; it creates child con
 
 ## Value Matchers
 
-Derive from <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher> and implement <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher.GetValueMatches*>, which returns a child context for each way the value can match at the current position, longest first. The base class takes care of the rest: when <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher.MatchRepeats> is `true` it also matches consecutive repeats of the exact characters that were matched, and when <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher.MatchTrailingSeparator> is `true` it also matches a single separator character after each occurrence.
+Derive from <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher> and implement <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher.GetValueMatches*>, which returns a child context for each way the value can match at the current position, longest first. The base class takes care of the rest. When <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher.MatchRepeats> is `true`, it also matches consecutive repeats of the exact characters that were matched. When <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher.MatchTrailingSeparator> is `true`, it also matches a single separator character after each occurrence.
 
 This matcher recognizes any word from a large list, which is more efficient than an <xref:Singulink.Cryptography.PasswordMatchers.AnyMatcher> over thousands of text matchers because it looks the candidate up instead of trying every word:
 
@@ -66,7 +66,7 @@ public sealed class WordListMatcher : ValueMatcher
 }
 ```
 
-Every result is produced with <xref:Singulink.Cryptography.PasswordMatchContext.CreateChild*>, which validates that the length is within the remaining characters. The <xref:Singulink.Cryptography.PasswordMatchItem> carries the text to show the user and the <xref:Singulink.Cryptography.PasswordMatchType> to report; use <xref:Singulink.Cryptography.PasswordMatchType.ContextualSubject> for values derived from the user's details and <xref:Singulink.Cryptography.PasswordMatchType.Common> for everything else.
+Every result is produced with <xref:Singulink.Cryptography.PasswordMatchContext.CreateChild*>, which checks that the length does not run past the remaining characters. The <xref:Singulink.Cryptography.PasswordMatchItem> carries the text to show the user and the <xref:Singulink.Cryptography.PasswordMatchType> to report; use <xref:Singulink.Cryptography.PasswordMatchType.ContextualSubject> for values derived from the user's details and <xref:Singulink.Cryptography.PasswordMatchType.Common> for everything else.
 
 > [!NOTE]
 > <xref:Singulink.Cryptography.PasswordMatchContext.RemainingChars> is a <xref:System.ReadOnlySpan`1>, which cannot be held across a `yield return`. A value matcher that returns several results therefore collects them in a list, as the example does, rather than being written as an iterator. Composite matchers, which only deal in contexts, can use iterators freely.
@@ -77,7 +77,7 @@ A value matcher can match at more than one length, as the example does. Return t
 
 ## Composite Matchers
 
-Derive from <xref:Singulink.Cryptography.PasswordMatcher> and implement <xref:Singulink.Cryptography.PasswordMatcher.GetMatchesCore*> to combine other matchers. Call <xref:Singulink.Cryptography.PasswordMatcher.GetMatches*> on each child to get its results for a context, then return the contexts your composition produces. This matcher limits how many characters its inner matcher may consume, which is useful for keeping a greedy matcher (such as a word list that happens to contain very long entries) from accounting for more of the password than intended:
+Derive from <xref:Singulink.Cryptography.PasswordMatcher> and implement <xref:Singulink.Cryptography.PasswordMatcher.GetMatchesCore*> to combine other matchers. Call <xref:Singulink.Cryptography.PasswordMatcher.GetMatches*> on each child to get its results for a context, then return the contexts your composition produces. This matcher limits how many characters its inner matcher may consume. That is useful for keeping a greedy matcher, such as a word list that happens to contain very long entries, from accounting for more of the password than intended:
 
 ```csharp
 public sealed class MaxLengthMatcher : PasswordMatcher
@@ -106,7 +106,7 @@ public sealed class MaxLengthMatcher : PasswordMatcher
 }
 ```
 
-The order in which a composite returns its results is the order in which they are tried by whatever contains it, and the first complete match of the whole password is the one reported. The example preserves the inner matcher's order. A composite that explores combinations, such as the built-in <xref:Singulink.Cryptography.PasswordMatchers.SequenceMatcher> and <xref:Singulink.Cryptography.PasswordMatchers.RepeatMatcher>, should keep only the first result per end position after each step rather than enumerating every combination, since the number of combinations can grow very quickly on long passwords even though the set of end positions cannot.
+Whatever contains a composite tries its results in the order the composite returns them, and the first complete match of the whole password is the one reported. The example preserves the inner matcher's order. A composite that explores combinations, such as the built-in <xref:Singulink.Cryptography.PasswordMatchers.SequenceMatcher> and <xref:Singulink.Cryptography.PasswordMatchers.RepeatMatcher>, should keep only the first result per end position after each step rather than enumerating every combination. The number of combinations can grow very quickly on long passwords, even though the set of end positions cannot.
 
 #### What the base class does
 
@@ -114,7 +114,16 @@ The order in which a composite returns its results is the order in which they ar
 
 ## Testing a Matcher
 
-<xref:Singulink.Cryptography.PasswordMatcher.GetFirstMatch*> runs a password against a list of matchers and returns a match only when the matchers consume the whole password, which makes it a precise way to test a matcher in isolation:
+<xref:Singulink.Cryptography.PasswordMatcher.GetFirstMatch*> runs a password against a list of matchers and returns the same <xref:Singulink.Cryptography.PasswordMatch> as the evaluator, which uses it internally. It returns a match only when the matchers consume the whole password, which makes it a precise way to test a matcher in isolation:
+
+```csharp
+var hunter = PasswordMatcher.Text("hunter");
+
+PasswordMatcher.GetFirstMatch("hunter", [hunter]);     // match with values ["hunter"]
+PasswordMatcher.GetFirstMatch("hunter2", [hunter]);    // null: the "2" is not consumed
+```
+
+The evaluator adds the length limit and the matchers provider on top of this. The same works for a matcher of your own:
 
 ```csharp
 var matcher = new WordListMatcher(["correct", "horse", "battery", "staple"]);
@@ -125,14 +134,14 @@ PasswordMatcher.GetFirstMatch("horse.horse", [phrase])!.Values;                 
 PasswordMatcher.GetFirstMatch("horses", [phrase]);                               // null
 ```
 
-Compose the matcher into a pattern and register it through a matchers provider to use it in real checks. See [Customizing the Patterns](customizing-patterns.md).
+Compose the matcher into a pattern and register it through a matchers provider to use it in real checks. See [Adding a Pattern](customizing-patterns.md#adding-a-pattern).
 
 ## Next Steps
 
 Continue with these related articles:
 
-- [Customizing the Patterns](customizing-patterns.md) - Plugging a custom matcher into the patterns.
+- [Adding Words and Patterns](customizing-patterns.md) - Plugging a custom matcher into the patterns.
 - [How Matching Works](../concepts/how-matching-works.md) - Normalization, ordering, caching and the rules every matcher follows.
-- [Match Results](match-results.md) - How the items a matcher creates are reported.
+- [Explaining a Rejection](match-results.md) - How the items a matcher creates are reported.
 
 </div>

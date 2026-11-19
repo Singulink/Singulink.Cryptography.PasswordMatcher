@@ -1,8 +1,8 @@
-- name: How Matching Works
-  href: how-matching-works.md
+- name: What It Catches and What It Doesn't
+  href: threat-model.md
 
-- name: The Default Patterns
+- name: Default Patterns
   href: default-patterns.md
 
-- name: Threat Model
-  href: threat-model.md
+- name: How Matching Works
+  href: how-matching-works.md

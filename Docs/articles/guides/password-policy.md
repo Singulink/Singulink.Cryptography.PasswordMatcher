@@ -6,7 +6,7 @@ Password Matcher answers one question: is this password built entirely from word
 
 ### What the guidelines ask for
 
-Modern guidance, such as [NIST SP 800-63B](https://pages.nist.gov/800-63-4/sp800-63b/passwords/), has moved away from composition rules (requiring digits, symbols and mixed case) and forced rotation, which push users towards predictable patterns like `Password1!`, and towards a small set of checks that actually block the passwords attackers try:
+Modern guidance, such as [NIST SP 800-63B](https://pages.nist.gov/800-63-4/sp800-63b/passwords/), has moved away from composition rules (requiring digits, symbols and mixed case) and from forced rotation. Both push users towards predictable patterns like `Password1!`. The guidance asks instead for a small set of checks that actually block the passwords attackers try:
 
 - Require a reasonable minimum length and allow long passwords (at least 64 characters).
 - Screen new passwords against a blocklist of commonly used, expected or compromised passwords.
@@ -17,7 +17,7 @@ Password Matcher is the "expected" part of the blocklist: the passwords that are
 
 ## A Complete Check
 
-Run the cheap checks first, and the matcher before the leaked password lookup, since the matcher runs in well under a millisecond for ordinary passwords while a leaked password lookup usually involves a network call or a large local database:
+Run the cheap checks first, then the matcher, then the leaked password lookup. The matcher runs in well under a millisecond for ordinary passwords, while a leaked password lookup usually involves a network call or a large local database:
 
 ```csharp
 public async Task<string?> ValidatePasswordAsync(string password, User user, CancellationToken cancellationToken)
@@ -48,7 +48,7 @@ public async Task<string?> ValidatePasswordAsync(string password, User user, Can
 }
 ```
 
-The subjects should include everything the attacker could plausibly know: the user's name, username, email address, and any other profile details that are visible or guessable. The names of your service, company and products apply to every check, so register them once on the provider as application subjects (shown below under hosting) rather than passing them each time. See [Contextual Subjects](contextual-subjects.md).
+The subjects should include everything the attacker could plausibly know: the user's name, username, email address, and any other profile details that are visible or guessable. The names of your service, company and products apply to every check, so register them once on the provider as application subjects (shown in [Hosting the Evaluator](#hosting-the-evaluator)) rather than passing them each time. See [Contextual Subjects](contextual-subjects.md).
 
 > [!TIP]
 > Run the same check when a password is changed, not only at sign-up, and consider passing the user's previous display names or email addresses as subjects as well, since users tend to reuse them.
@@ -58,13 +58,13 @@ The subjects should include everything the attacker could plausibly know: the us
 Two limits are involved, and they serve different purposes:
 
 - **Your application's maximum** is a policy decision. The guidelines ask for at least 64 characters to be accepted; 64 to 128 is typical, and the cost of the password hash is usually what bounds it.
-- <xref:Singulink.Cryptography.PasswordMatchEvaluator.MaxPasswordLength> is a safety net inside the evaluator, 128 by default. Passwords longer than it are returned as not matched without being evaluated, so that an unusually long input can never make a check expensive. Matching cost grows roughly quadratically with length: a 128 character password built entirely of repeated common tokens takes tens of milliseconds, where an ordinary password takes a fraction of one.
+- <xref:Singulink.Cryptography.PasswordMatchEvaluator.MaxPasswordLength> is a safety net inside the evaluator, 128 by default. The evaluator returns longer passwords as not matched without evaluating them, so an unusually long input can never make a check expensive. Matching cost grows roughly quadratically with length: a 128 character password built entirely of repeated common tokens takes tens of milliseconds, where an ordinary password takes a fraction of one.
 
-Enforce your own maximum before calling the evaluator, as the example does. If your maximum is higher than 128, decide whether passwords above the evaluator's limit should be checked at all: a 200 character password composed entirely of common words is not a realistic attack target, so leaving the default and skipping the check is reasonable, but the limit can be raised with the evaluator's constructor if you prefer.
+Enforce your own maximum before calling the evaluator, as the example does. If your maximum is higher than 128, decide whether passwords above the evaluator's limit should be checked at all. A 200 character password composed entirely of common words is not a realistic attack target, so leaving the default and skipping the check is reasonable. If you prefer, raise the limit with the evaluator's constructor.
 
 ## Hosting the Evaluator
 
-<xref:Singulink.Cryptography.PasswordMatchEvaluator> is immutable and safe to use from any number of threads, so one instance serves the whole application. Build it once with your application subjects and register it as a singleton, injecting it through <xref:Singulink.Cryptography.IPasswordMatchEvaluator>:
+<xref:Singulink.Cryptography.PasswordMatchEvaluator> is immutable and safe to use from any number of threads, so one instance serves the whole application. Build it once with your application subjects, register it as a singleton, and inject it through <xref:Singulink.Cryptography.IPasswordMatchEvaluator>:
 
 ```csharp
 var matchersProvider = new PasswordMatchersProvider(ContextualSubjectMatcherProvider.Default, [
@@ -82,7 +82,7 @@ The first check in a process pays a one-time cost of a few tens of milliseconds 
 
 #### Testing with a fake evaluator
 
-Code that depends on <xref:Singulink.Cryptography.IPasswordMatchEvaluator> can be tested with a stub that returns a fixed <xref:Singulink.Cryptography.PasswordMatch> or `null`. A match is constructed from its items:
+Code that depends on <xref:Singulink.Cryptography.IPasswordMatchEvaluator> can be tested with a stub that returns a fixed <xref:Singulink.Cryptography.PasswordMatch> or `null`. To create the match, pass its items to the constructor:
 
 ```csharp
 var stubMatch = new PasswordMatch([
@@ -91,12 +91,75 @@ var stubMatch = new PasswordMatch([
 ]);
 ```
 
+## Using It With ASP.NET Core Identity
+
+ASP.NET Core Identity checks a password with every registered [IPasswordValidator&lt;TUser&gt;](https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.identity.ipasswordvalidator-1) when a user is created with a password, and when a password is added or changed. Plug the check in as one more validator.
+
+#### Writing the validator
+
+The validator builds the subjects from the user and reports the matched words as an [IdentityError](https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.identity.identityerror):
+
+```csharp
+public sealed class PasswordMatchValidator<TUser>(IPasswordMatchEvaluator evaluator) : IPasswordValidator<TUser>
+    where TUser : class
+{
+    public async Task<IdentityResult> ValidateAsync(UserManager<TUser> manager, TUser user, string? password)
+    {
+        if (string.IsNullOrEmpty(password))
+            return IdentityResult.Success;                  // nothing to check
+
+        List<ContextualSubject> subjects = [];
+
+        if (await manager.GetUserNameAsync(user) is { } userName)
+            subjects.Add(new(userName, ContextualSubjectType.Username));
+
+        if (manager.SupportsUserEmail && await manager.GetEmailAsync(user) is { } email)
+            subjects.Add(new(email, ContextualSubjectType.Email));
+
+        if (evaluator.MatchPassword(password, subjects) is not { } match)
+            return IdentityResult.Success;
+
+        string words = string.Join(", ", match.Values.Distinct().Select(v => $"\"{v}\""));
+
+        return IdentityResult.Failed(new IdentityError {
+            Code = "CommonPassword",
+            Description = $"Your password is made up entirely of words that are commonly used in passwords or that are easy to " +
+                          $"guess from your account details ({words}). Add an uncommon word or character sequence to make it harder to guess.",
+        });
+    }
+}
+```
+
+Add any other profile fields your user type has, such as a display name, as further subjects.
+
+#### Registering it
+
+Register the evaluator as a singleton, as shown above, and add the validator to Identity:
+
+```csharp
+builder.Services.AddSingleton<IPasswordMatchEvaluator>(new PasswordMatchEvaluator(matchersProvider, maxPasswordLength: 64));
+
+builder.Services.AddIdentity<IdentityUser, IdentityRole>(options => {
+        options.Password.RequiredLength = 8;
+        options.Password.RequireDigit = false;              // composition rules off, as NIST advises
+        options.Password.RequireLowercase = false;
+        options.Password.RequireUppercase = false;
+        options.Password.RequireNonAlphanumeric = false;
+    })
+    .AddPasswordValidator<PasswordMatchValidator<IdentityUser>>();  // runs alongside Identity's own validator
+```
+
+Identity runs your validator in addition to its own, which applies the options. It has no option for a maximum length, so enforce yours where the password is accepted, as in [A Complete Check](#a-complete-check).
+
+> [!NOTE]
+> By default Identity requires a digit, a lower-case letter, an upper-case letter and a symbol. Composition rules like these push users towards passwords like `Password1!`, so turn them off and rely on length and this check, as [the guidelines](#what-the-guidelines-ask-for) advise.
+
 ## Next Steps
 
 Continue with these related articles:
 
-- [Threat Model](../concepts/threat-model.md) - What the matcher catches, what it leaves to the leaked password database, and the false positives to expect.
-- [Match Results](match-results.md) - Wording the rejection message.
-- [Customizing the Patterns](customizing-patterns.md) - Adding your product names and other words.
+- [What It Catches and What It Doesn't](../concepts/threat-model.md) - What the matcher catches, what it leaves to the leaked password database, and the false positives to expect.
+- [Explaining a Rejection](match-results.md) - Wording the rejection message.
+- [Adding Words and Patterns](customizing-patterns.md) - Adding your product names and other words.
 
 </div>

@@ -1,10 +1,10 @@
 <div class="article">
 
-# Match Results
+# Explaining a Rejection
 
 A successful check returns a <xref:Singulink.Cryptography.PasswordMatch> that describes exactly what the password was built from. This guide covers what the match contains, what each match type means, and how to turn a match into a message the user can act on.
 
-## The Match Object
+## Match Object
 
 <xref:Singulink.Cryptography.PasswordMatchEvaluator.MatchPassword*> returns `null` when the password does not match, so the match object itself only ever describes a rejection. It has two views of the same information:
 
@@ -22,7 +22,24 @@ match.ToString();             // "\"QWERT\" (CharSequence) \"password\" (Common)
 
 #### Values are the dictionary form
 
-<xref:Singulink.Cryptography.PasswordMatchItem.MatchedText> holds the value in the form the user will recognize, not the characters that were actually in the password. A password of `p@55w0rd` reports `password`, because that is the word the attacker's dictionary contains and the word the user needs to get rid of. Character sequences are reported in upper case (`QWERTY`, `ABC`) to stand out as sequences rather than words. The characters that were actually matched are available as <xref:Singulink.Cryptography.PasswordMatchItem.MatchedChars> (`p@55w0rd`, `qwerty`), taken from the normalized password, for highlighting the matched part of what the user typed or for showing both forms side by side. Separators between values (`password.123` or `the-bad-admin`) are consumed by the match but are not reported, since they are not part of what made the password weak.
+Each item has two forms of its value:
+
+| Password | <xref:Singulink.Cryptography.PasswordMatchItem.MatchedText> | <xref:Singulink.Cryptography.PasswordMatchItem.MatchedChars> |
+|---|---|---|
+| `p@55w0rd` | `password` | `p@55w0rd` |
+| `QWERTY` | `QWERTY` | `qwerty` |
+| `abc` | `ABC` | `abc` |
+
+<xref:Singulink.Cryptography.PasswordMatchItem.MatchedText> holds the value in the form the user will recognize. A password of `p@55w0rd` reports `password`, because that is the word the attacker's dictionary contains and the word the user needs to get rid of. Character sequences are reported in upper case, so that they stand out as sequences rather than words.
+
+<xref:Singulink.Cryptography.PasswordMatchItem.MatchedChars> holds the characters that were actually matched, taken from the normalized password. Use it to highlight the matched part of what the user typed, or for showing both forms side by side.
+
+Separators between values are consumed by the match but are not reported, since they are not part of what made the password weak:
+
+```text
+password.123    reports "password", "123"
+the-bad-admin   reports "the", "bad", "admin"
+```
 
 ## Match Types
 
@@ -38,11 +55,17 @@ match.ToString();             // "\"QWERT\" (CharSequence) \"password\" (Common)
 | <xref:Singulink.Cryptography.PasswordMatchType.AnyChars> | A short run of arbitrary digits or symbols decorating the words. | `47`, `#1`, `1!` |
 | <xref:Singulink.Cryptography.PasswordMatchType.RepeatValue> | A repeat of the value matched immediately before it. | the second `you` in `iloveyouyou` |
 
-A value that occurs several times is reported once per occurrence. The default patterns allow a few consecutive words, so the first occurrences are usually reported as separate `Common` or `ContextualSubject` matches, and `RepeatValue` appears once the pattern has no room for another: `memememememe` is reported as three `Common` items followed by three `RepeatValue` items, all with the text `me`. Treat the two the same way when wording a message, and deduplicate <xref:Singulink.Cryptography.PasswordMatch.Values> if you only want to tell the user which distinct words were found.
+A value that occurs several times is reported once per occurrence. The default patterns allow a few consecutive words, so the first occurrences are usually reported as separate `Common` or `ContextualSubject` matches. `RepeatValue` appears once the pattern has no room for another word:
+
+```text
+memememememe   reports "me" (Common) three times, then "me" (RepeatValue) three times
+```
+
+Treat the two the same way when wording a message, and deduplicate <xref:Singulink.Cryptography.PasswordMatch.Values> if you only want to tell the user which distinct words were found.
 
 ## Explaining the Rejection
 
-The point of returning the values is to let the user fix the problem on the first try. A message that names the words works far better than a generic one:
+The point of returning the values is to let the user fix the problem on the first try. The library returns data, not text: the message is yours to word, and to localize. A message that names the words works far better than a generic one:
 
 ```csharp
 static string? GetRejectionMessage(PasswordMatch? match)
@@ -76,20 +99,11 @@ if (contextual.Count > 0)
 ```
 
 > [!TIP]
-> Keep the suggestion constructive. The matched words tell the user what to remove; suggesting they add an uncommon word tells them what to do instead, and keeps them from simply appending another digit, which the suffix patterns will catch anyway.
+> Keep the suggestion constructive. The matched words tell the user what to remove. Suggesting that they add an uncommon word tells them what to do instead, and keeps them from simply appending another digit, which the check catches anyway as a [decoration](../concepts/default-patterns.md#decorations).
 
 ## Matching Without an Evaluator
 
-<xref:Singulink.Cryptography.PasswordMatcher.GetFirstMatch*> runs a password against any set of matchers directly and returns the same <xref:Singulink.Cryptography.PasswordMatch>. It is what the evaluator uses internally, and it is the easiest way to test a matcher in isolation, since a match is only returned when the matchers consume the entire password:
-
-```csharp
-var matcher = PasswordMatcher.Text("hunter");
-
-PasswordMatcher.GetFirstMatch("hunter", [matcher]);     // match with values ["hunter"]
-PasswordMatcher.GetFirstMatch("hunter2", [matcher]);    // null: the "2" is not consumed
-```
-
-The evaluator adds the length limit and the matchers provider on top of this. See [Writing Custom Matchers](custom-matchers.md) for testing matchers this way.
+<xref:Singulink.Cryptography.PasswordMatcher.GetFirstMatch*> runs a password against any set of matchers directly and returns the same <xref:Singulink.Cryptography.PasswordMatch>. See [Testing a Matcher](custom-matchers.md#testing-a-matcher).
 
 ## Next Steps
 

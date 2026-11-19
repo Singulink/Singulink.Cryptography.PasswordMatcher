@@ -1,8 +1,23 @@
 <div class="article">
 
-# Threat Model
+# What It Catches and What It Doesn't
 
 Password Matcher targets one specific attack and is deliberately conservative about everything else. This article describes the attack it defends against, what it catches and what it leaves to other checks, and the kinds of false positives and negatives to expect.
+
+### At a glance
+
+Each password was checked twice: with no contextual subjects, and with a name subject of `Jane Doe`. "Caught for Jane" means caught only in the second check.
+
+| Password | Result | Why |
+|---|---|---|
+| `password123` | Caught | A common word and a keyboard sequence |
+| `P@ssw0rd2024` | Caught | A common word with substitutions, and a year |
+| `iloveyou!!` | Caught | A common phrase and a symbol run |
+| `admin_admin_2024` | Caught | A repeated common word and a year |
+| `janedoe2024!` | Caught for Jane | The user's name, a year and a symbol |
+| `summer2024` | Not caught | `summer` is not in the word lists |
+| `password47921` | Not caught | Five arbitrary digits are more than a decoration |
+| `correct horse battery staple` | Not caught | A passphrase of words outside the lists |
 
 ### Dynamic dictionary attacks
 
@@ -14,7 +29,7 @@ The first few million candidates such an attack produces cover a remarkable shar
 
 A password is rejected when it is composed *entirely* of values from the default word lists and the contextual subjects, in one of the default patterns, with the variations an attack generates:
 
-- **Common words in common structures.** `password`, `iloveyou`, `letmein`, `iamthebest`, `welcometoadmin`, `coolasaninja`. See [The Default Patterns](default-patterns.md).
+- **Common words in common structures.** `password`, `iloveyou`, `letmein`, `iamthebest`, `welcometoadmin`, `coolasaninja`. See [Default Patterns](default-patterns.md).
 - **Contextual words.** The user's name, username, email address words, and your service, company and product names, alone or in the same structures: `mikepassword`, `singulinkadmin`, `iamthebusinessadmin`.
 - **Any short combination of those words.** Up to six words or structured decorations in any order, so `loveyou`, `trustno1`, `mike123acme` and `ninja!admin` are caught even though no sentence pattern describes them.
 - **Character substitutions.** `p@55w0rd`, `n1nja`, `s1ngul1nk`.
@@ -37,9 +52,9 @@ The intended complement is a leaked password database such as [Have I Been Pwned
 
 ## False Positives
 
-The full consumption rule makes false positives rare: a password is only rejected when nothing in it falls outside the lists. A user who adds any uncommon word, or any sequence of characters that is not a sequence, a repeat or a few arbitrary digits or symbols, is never rejected by this check. The cases worth knowing about are:
+The full consumption rule makes false positives rare: a password is only rejected when nothing in it falls outside the lists. A user who adds any uncommon word is never rejected by this check. Neither is a user who adds any characters that are not a character sequence, a repeat or a few arbitrary digits or symbols. The cases worth knowing about are:
 
-- **Short contextual words.** A name of `Al` or a username of `jd` makes `al` or `jd` a matchable word. This cannot reject a password that contains anything else, but it does mean that `al2024!` is rejected for that user, which is correct, and that the explanation can name a word the user did not think of as a word. Substitutions are not applied to words of one or two letters, so `4l` is not taken for the name.
+- **Short contextual words.** A name of `Al` or a username of `jd` makes `al` or `jd` a matchable word. This cannot reject a password that contains anything else. It does mean that `al2024!` is rejected for that user, which is correct, and that the explanation can name a word the user did not think of as a word. Substitutions are not applied to words of one or two letters, so `4l` is not taken for the name.
 - **Short decorations.** Up to four arbitrary digits or symbols count as a decoration at each end of the words, so `password4792` and `Acme#1` are rejected. This is deliberate: a word followed by a four-digit number is one of the first things a dictionary attack tries, and `4792` could as easily be a birth year, a PIN or a street number as a random choice.
 - **Joining characters.** In the catch-all pattern a single digit or symbol may join a word to what precedes it, so `ninja!admin` and `mike1admin` are rejected. The explanation reports the joiner as a value of its own.
 
@@ -55,7 +70,7 @@ A password that is nearly all common values but has one character out of place e
 These articles cover the related topics in more depth:
 
 - [Password Policy Integration](../guides/password-policy.md) - Combining the check with a leaked password database and rate limiting.
-- [The Default Patterns](default-patterns.md) - Exactly which words and structures are matched.
-- [Customizing the Patterns](../guides/customizing-patterns.md) - Extending the lists for your application.
+- [Default Patterns](default-patterns.md) - Exactly which words and structures are matched.
+- [Adding Words and Patterns](../guides/customizing-patterns.md) - Extending the lists for your application.
 
 </div>

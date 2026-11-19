@@ -1,6 +1,6 @@
 <div class="article">
 
-# The Default Patterns
+# Default Patterns
 
 <xref:Singulink.Cryptography.PasswordMatchersProvider.Default> matches passwords against ten sentence-like patterns built from curated lists of the words that appear most often in passwords, plus a catch-all pattern for short combinations of those words. This article lists the patterns, the word lists, and the decorations that can surround them, so that you know exactly what the default check rejects.
 
@@ -24,9 +24,9 @@ A subject is one or two consecutive subject words. A subject word is either a co
 
 A handful of common profanities are included as well. Every word accepts repeats and a trailing separator, and words of three or more letters accept character substitutions, as described in [How Matching Works](how-matching-works.md). A subject may be preceded by a determiner from <xref:Singulink.Cryptography.PasswordMatchers.CommonMatchers.SubjectDeterminerMatcher>: `the`, `a`, `an`, `this`, `my`, `your`, `their`, `trusted`, `into`, `let`.
 
-## The Patterns
+## Patterns
 
-Each pattern below is tried in order, and each except the first may start and end with a decoration (described in the next section). Square brackets mark optional parts.
+Each pattern below is tried in order, and each except the first may start and end with a decoration (see [Decorations](#decorations)). Square brackets mark optional parts. A password in the Example column may be reported by an earlier pattern that also explains it. The [Examples](#examples) table below shows which pattern reports each of its passwords.
 
 | # | Pattern | Example |
 |---|---|---|
@@ -39,7 +39,7 @@ Each pattern below is tried in order, and each except the first may start and en
 | 7 | [[determiner] subject copular verb] adjective [conjunction] [determiner] subject | `coolasaninja`, `iamcoolasaninja` |
 | 8 | [determiner] subject [conjunction] [determiner] subject [[copular verb] adjective] | `youandme`, `letmeinadmin`, `thepasswordandtheadminaregreat` |
 | 9 | [determiner] subject verb [to] verb | `ilovetologin` |
-| 10 | [determiner] subject verb [to] [verb [to]] [determiner] subject | `iloveyou`, `welcometoadmin`, `MikeMikeLogInToSingulinkSingulink` |
+| 10 | [determiner] subject verb [to] [verb [to]] [determiner] subject | `ihateyou`, `iwanttologinadmin`, `MikeMikeLogInToSingulinkSingulink` |
 | 11 | up to six words or structured decorations in any order, where a word may be joined to what precedes it by a single digit or symbol | `loveyou`, `trustno1`, `cool2024!`, `ninja!admin`, `mike1admin` |
 
 Pattern 1 catches passwords that are nothing but decorations: keyboard sequences, years, repeated digits and symbols. Pattern 2 is the one most weak passwords fall into, since a single subject with a decoration covers `password123`, `admin2024!`, `Acme#1` and `n1nja!`. Pattern 11 is the safety net for combinations the sentence patterns do not anticipate: any word from any list, any contextual subject and any structured decoration, in any order, up to <xref:Singulink.Cryptography.PasswordMatchersProvider.MaxCatchAllTokens> of them. Since every token is a weak value, it cannot reject a password that contains anything uncommon.
@@ -71,7 +71,24 @@ Every pattern except the first may start and end with <xref:Singulink.Cryptograp
   - A group of two or three digits or symbols repeated two or more times (<xref:Singulink.Cryptography.PasswordMatchers.CommonMatchers.DigitOrSymbolGroupMatcher>): `121212`, `1!1!`.
 - **A short decoration** (<xref:Singulink.Cryptography.PasswordMatchers.CommonMatchers.ShortDecorationMatcher>): one to four arbitrary digits or symbols other than separators, such as `47`, `#1` or `4792`.
 
-A decoration is a run of one to six structured decorations in any order (<xref:Singulink.Cryptography.PasswordMatchers.CommonMatchers.DecorationRunMatcher>), with at most one short decoration before, after or between runs. So `password` can be followed by `1`, `#1`, `47`, `4792`, `123`, `2024!!`, `1234qwerty`, `!!!2024`, `123123`, `121212` or `@123`, and preceded by the same, but not by five arbitrary digits (`password47921` is not matched). Years and sequences also accept repeats and separators, so `password.123123.123123` matches.
+A decoration is a run of one to six structured decorations in any order (<xref:Singulink.Cryptography.PasswordMatchers.CommonMatchers.DecorationRunMatcher>), with at most one short decoration before, after or between runs. Years and sequences also accept repeats and separators. Any of these can follow `password`, or precede it:
+
+```text
+password1                 a short decoration
+password#1                a short decoration
+password47                a short decoration
+password4792              a short decoration
+password123               a keyboard row
+password2024!!            a year and a symbol run
+password1234qwerty        two keyboard rows
+password!!!2024           a symbol run and a year
+password123123            a keyboard row and its repeat
+password121212            a repeated group
+password@123              a short decoration and a keyboard row
+password.123123.123123    a keyboard row, repeated with separators
+2024!!password            the same decorations in front
+password47921             no match: five arbitrary digits are not a decoration
+```
 
 The limit of four arbitrary characters is what separates a decoration from entropy. A dictionary attack appends a few digits or symbols to every word it tries; it does not append five random ones.
 
@@ -87,26 +104,34 @@ A few passwords and how the default patterns explain them, with a company subjec
 | `Password#1` | password, #1 | 2 |
 | `1qaz2wsx` | 1QAZ, 2WSX | 1 |
 | `1q2w3e4r` | 1Q2W3E4R | 1 |
-| `iloveyou!!` | i, love, you, !! | 10 |
+| `iloveyou!!` | i, love, you, !! | 2 |
 | `LetMeIn2024!` | let, me, in, 2024, ! | 2 |
 | `this is a bad password` | this, is, a, bad, password | 6 |
 | `IAmABad@dmin` | i, am, a, bad, admin | 6 |
 | `s1ngul1nkisthebest` | singulink, is, the, best | 3 |
 | `iamthebusinessadmin` | i, am, the, business, admin | 4 |
-| `MikeMikeLogInToSingulinkSingulink1!` | mike, mike, login, to, singulink, singulink, 1! | 10 |
+| `MikeMikeLogInToSingulinkSingulink1!` | mike, mike, login, to, singulink, singulink, 1! | 8 |
 | `admin_admin_2024` | admin, admin, 2024 | 2 |
 | `trustno1` | trust, no1 | 11 |
 | `cool2024!` | cool, 2024, ! | 11 |
 | `mike1admin` | mike, 1, admin | 11 |
 
-And a few that do not match, because something in them is not a common value: `thisisnotamatch` (`not` and `match` are not in the lists), `hello world!!` (`world`), `summer2024` (`summer`), `correct horse battery staple` and `Tr0ub4dor&3`.
+And a few that do not match, because something in them is not a common value:
+
+| Password | Not in the lists |
+|---|---|
+| `thisisnotamatch` | `not`, `match` |
+| `hello world!!` | `world` |
+| `summer2024` | `summer` |
+| `correct horse battery staple` | `correct`, `horse`, `battery`, `staple` |
+| `Tr0ub4dor&3` | `troubador` |
 
 ## Further Reading
 
 These articles cover the related topics in more depth:
 
-- [Customizing the Patterns](../guides/customizing-patterns.md) - Adding words and patterns, or replacing the provider.
+- [Adding Words and Patterns](../guides/customizing-patterns.md) - Adding words and patterns, or replacing the provider.
 - [How Matching Works](how-matching-works.md) - Substitutions, repeats, separators and ordering.
-- [Threat Model](threat-model.md) - What these patterns do and do not protect against.
+- [What It Catches and What It Doesn't](threat-model.md) - What these patterns do and do not protect against.
 
 </div>

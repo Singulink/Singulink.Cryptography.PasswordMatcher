@@ -1,17 +1,24 @@
-- name: Getting Started
-  href: getting-started.md
+- name: Checking Passwords
+  items:
+  - name: Getting Started
+    href: getting-started.md
 
-- name: Contextual Subjects
-  href: contextual-subjects.md
+  - name: Password Policy Integration
+    href: password-policy.md
 
-- name: Match Results
-  href: match-results.md
+  - name: Contextual Subjects
+    href: contextual-subjects.md
 
-- name: Customizing the Patterns
-  href: customizing-patterns.md
+  - name: Explaining a Rejection
+    href: match-results.md
 
-- name: Writing Custom Matchers
-  href: custom-matchers.md
+- name: Extending the Matcher
+  items:
+  - name: Adding Words and Patterns
+    href: customizing-patterns.md
 
-- name: Password Policy Integration
-  href: password-policy.md
+  - name: Matcher Building Blocks
+    href: building-blocks.md
+
+  - name: Writing Custom Matchers
+    href: custom-matchers.md

@@ -22,13 +22,29 @@ The evaluator's <xref:Singulink.Cryptography.PasswordMatchEvaluator.MaxPasswordL
 
 ## Matchers and Contexts
 
-A <xref:Singulink.Cryptography.PasswordMatchContext> is a position in the password plus the chain of items matched to reach it. A <xref:Singulink.Cryptography.PasswordMatcher> takes a context and returns the contexts that result from matching at that position: none if it does not match, one for a word that matches one way, several for a matcher that can consume different numbers of characters (a keyboard sequence that could be `qwe`, `qwer` or `qwert`, for instance).
+A <xref:Singulink.Cryptography.PasswordMatchContext> is a position in the password plus the chain of items matched to reach it. A <xref:Singulink.Cryptography.PasswordMatcher> takes a context and returns the contexts that result from matching at that position. It returns none if it does not match, one for a word that matches one way, and several if it can consume different numbers of characters, such as a keyboard sequence that could be `qwe`, `qwer` or `qwert`.
 
-Composite matchers build on this. A sequence feeds each result of one matcher into the next; an alternative concatenates the results of its options; an optional returns the unchanged context followed by its matcher's results; a repeat feeds each result back into the same matcher up to a maximum number of times; a permutation explores every order of its matchers. Together they describe the full set of ways a pattern can account for a prefix of the password.
+Composite matchers build on this:
+
+| Composite | Returns |
+|---|---|
+| Sequence | Each result of one matcher fed into the next |
+| Alternative (any) | The results of its options, one after another |
+| Optional | The unchanged context, followed by its matcher's results |
+| Repeat | Each result fed back into the same matcher, up to a maximum number of times |
+| Permutations | Every order of its matchers, each used at most once. By default any non-empty subset of them counts |
+
+Together they describe the full set of ways a pattern can account for a prefix of the password.
 
 #### Full consumption
 
-A password matches a pattern only when some result reaches the end of the password. Partial coverage is not a match: `passwordk4efjawei` begins with the most common word there is, but nothing accounts for the rest, so it does not match. This is the rule that keeps the check conservative. It never rejects a password for containing a common word; it rejects a password for being *nothing but* common words.
+A password matches a pattern only when some result reaches the end of the password. Partial coverage is not a match:
+
+```text
+passwordk4efjawei   no match: it begins with the most common word there is, but nothing accounts for the rest
+```
+
+This is the rule that keeps the check conservative. It never rejects a password for containing a common word; it rejects a password for being *nothing but* common words.
 
 ## Ordering and the First Match
 
@@ -42,7 +58,14 @@ Three ordering rules give the explanations their shape:
 
 ## Value Matching Rules
 
-The <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher> base class gives every text, digit, character sequence, repeated character, repeated group and arbitrary character matcher the same three behaviors on top of recognizing its value.
+Every matcher that consumes characters derives from the <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher> base class, which can add repeats and a trailing separator to whatever the matcher recognizes. Text matchers also accept substitutions:
+
+| Matcher | Substitutions | Repeats | Trailing separator |
+|---|---|---|---|
+| Text | On by default | On by default | On by default |
+| Fixed digits | No | On by default | On by default |
+| Character sequence | No | Always | On by default |
+| Repeated character, repeated group, arbitrary characters | No | Never | On by default |
 
 #### Substitutions
 
@@ -60,17 +83,38 @@ A <xref:Singulink.Cryptography.PasswordMatchers.TextMatcher> accepts common char
 | l | `1` `\|` `7` | y | `¥` |
 | n | `И` `ท` | z | `2` `%` |
 
-Substitution is per character: each letter of the word is either itself or one of its substitutes. Substitutions can be turned off per matcher, which the default lists and the default contextual subject provider do for values that are themselves digits, such as `69` and `420`, and for words of one or two letters, since a lone `1` or `@` is far more likely to be a decoration than the word `i` or `a`.
+Substitution is per character: each letter of the word is either itself or one of its substitutes. Substitutions can be turned off per matcher. The default lists and the default contextual subject provider turn them off for values that are themselves digits, such as `69` and `420`, and for words of one or two letters, since a lone `1` or `@` is far more likely to be a decoration than the word `i` or `a`.
 
 #### Repeats
 
-After a value matches, the exact characters that matched may match again immediately, any number of times. The repeat is of the characters, not the word, so `p@sswordp@ssword` matches but `p@sswordpassword` does not: an attacker who doubles a word doubles it verbatim. A repeat matched this way is reported as a <xref:Singulink.Cryptography.PasswordMatchType.RepeatValue> item with the same text as the original. When the surrounding pattern allows the same word again as a separate match, that explanation is found first and the repeat is reported as an ordinary match instead; see [Match Results](../guides/match-results.md).
+After a value matches, the exact characters that matched may match again immediately, any number of times. The repeat is of the characters, not the word, since an attacker who doubles a word doubles it verbatim:
+
+```csharp
+var matcher = PasswordMatcher.Text("password");
+
+PasswordMatcher.GetFirstMatch("p@sswordp@ssword", [matcher]);   // match: "password", then a repeat
+PasswordMatcher.GetFirstMatch("p@sswordpassword", [matcher]);   // null: the second half is not the same characters
+```
+
+The default patterns still reject `p@sswordpassword`, as two words in a row. A repeat matched this way is reported as a <xref:Singulink.Cryptography.PasswordMatchType.RepeatValue> item with the same text as the original. When the surrounding pattern allows the same word again as a separate match, that explanation is found first and the repeat is reported as an ordinary match instead; see [Explaining a Rejection](../guides/match-results.md).
 
 #### Separators
 
-A single separator character may follow each occurrence of a value: a space, period, dash, underscore or comma (see <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher.Separators>). Separators are consumed but not reported, so `the.bad.admin`, `the-bad-admin` and `the bad admin` all report `the`, `bad`, `admin`. Repeats and separators combine, so `me.me me-me` is one word repeated four times.
+A single separator character may follow each occurrence of a value: a space, period, dash, underscore or comma (see <xref:Singulink.Cryptography.PasswordMatchers.ValueMatcher.Separators>). Separators are consumed but not reported, and they combine with repeats:
 
-A trailing separator on its own is also consumed. `password.` and `password_` match as just `password`, since a single trailing punctuation character is one of the first variations any attack tries.
+```text
+the.bad.admin   reports "the", "bad", "admin"
+the-bad-admin   reports "the", "bad", "admin"
+the bad admin   reports "the", "bad", "admin"
+me.me me-me     reports "me" four times: one word, repeated with separators
+```
+
+A trailing separator on its own is also consumed, since a single trailing punctuation character is one of the first variations any attack tries:
+
+```text
+password.   reports "password"
+password_   reports "password"
+```
 
 ## Memoization
 
@@ -87,7 +131,7 @@ Sequences and repeats apply the same deduplication after each step, and permutat
 | 128 characters of `123123…` followed by one character that cannot match | About 20 ms |
 | 128 characters of `1111…` followed by one character that cannot match | About 90 ms |
 
-The length limit on the evaluator caps the quadratic term. Together they make the cost of a check predictable for any input, which matters when the check runs on a sign-up endpoint that accepts input from anyone.
+The length limit on the evaluator caps the quadratic term. Together, the memoization and the length limit make the cost of a check predictable for any input, which matters when the check runs on a sign-up endpoint that accepts input from anyone.
 
 > [!NOTE]
 > Caching is also why a matcher's results must depend only on the remaining characters, never on what was matched before it. See [Writing Custom Matchers](../guides/custom-matchers.md).
@@ -96,8 +140,8 @@ The length limit on the evaluator caps the quadratic term. Together they make th
 
 These articles cover the related topics in more depth:
 
-- [The Default Patterns](default-patterns.md) - The grammar the default provider runs.
+- [Default Patterns](default-patterns.md) - The grammar the default provider runs.
 - [Writing Custom Matchers](../guides/custom-matchers.md) - The contract a matcher implements.
-- [Threat Model](threat-model.md) - What the full consumption rule means for false positives and negatives.
+- [What It Catches and What It Doesn't](threat-model.md) - What the full consumption rule means for false positives and negatives.
 
 </div>

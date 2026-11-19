@@ -6,11 +6,11 @@ A contextual subject is a value specific to the user or your application that a 
 
 ### Why context matters
 
-A password list built for attacking a particular service always includes the service's name, and a list built for a particular account includes whatever is known about its owner. `AcmeJane2024!` is as weak on Acme's site for a user named Jane as `password2024!` is anywhere, but no static dictionary can know that. Contextual subjects let the evaluator know it for each check.
+A password list built for attacking a particular service always includes the service's name, and a list built for a particular account includes whatever is known about its owner. For a user named Jane on Acme's site, `AcmeJane2024!` is as weak as `password2024!` is anywhere, but no static dictionary can know that. Contextual subjects let the evaluator know it for each check.
 
 ## Creating Subjects
 
-A <xref:Singulink.Cryptography.ContextualSubject> pairs a value with a <xref:Singulink.Cryptography.ContextualSubjectType>. The value is trimmed; everything else about how it is interpreted is up to the provider that turns it into a matcher (see below). Pass the subjects for the current user to <xref:Singulink.Cryptography.PasswordMatchEvaluator.MatchPassword*> on each check:
+A <xref:Singulink.Cryptography.ContextualSubject> pairs a value with a <xref:Singulink.Cryptography.ContextualSubjectType>. The value is trimmed. Everything else about how it is interpreted is up to the provider that turns it into a matcher, described below. Pass the subjects for the current user to <xref:Singulink.Cryptography.PasswordMatchEvaluator.MatchPassword*> on each check:
 
 ```csharp
 ContextualSubject[] subjects = [
@@ -44,16 +44,59 @@ The types that share the default treatment exist so that a custom provider can t
 
 <xref:Singulink.Cryptography.ContextualSubjectMatcherProvider.Default> turns each subject into a matcher in three steps:
 
-1. **Normalize.** Email and website values have the parts every address shares removed, as described above.
-2. **Split.** The value is split into words on the provider's <xref:Singulink.Cryptography.ContextualSubjectMatcherProvider.Delimiters>: space, comma, period, dash, underscore, plus sign, colon, semicolon and `@` by default. Words are then split again where the case changes from lower to upper and where letters change to digits or back, so `MikeSmith`, `mike_smith` and `mike1985` all yield `mike`, and `ACMEWidgets` yields `acme` and `widgets`. Parts shorter than two characters are dropped.
+1. **Normalize.** The parts that every address shares are removed from email and website values, as the table above shows.
+2. **Split.** The value is split into words on the provider's <xref:Singulink.Cryptography.ContextualSubjectMatcherProvider.Delimiters>: space, comma, period, dash, underscore, plus sign, colon, semicolon and `@` by default. Words are then split again where the case changes from lower to upper and where letters change to digits or back. Parts shorter than two characters are dropped.
 3. **Build.** A single word becomes a text matcher for that word. Several words become a permutations matcher, so any subset of the words matches in any order, each word at most once.
 
-Each word is matched the same way as a common word: case-insensitively, with character substitutions for words of three or more letters (`j4ne` matches `jane`), with repeats (`janejane`), and with an optional separator after each occurrence (`jane.doe`). The result is that a name of `Jane Doe` matches `janedoe`, `doejane`, `jane`, `doe`, `jane-doe` and `j4ne_d0e`. Each word is used at most once within a single subject match, but the default patterns allow several consecutive subjects, so `janedoejane` still matches as the subject `jane doe` followed by the subject `jane`. See [How Matching Works](../concepts/how-matching-works.md) for the matching rules in detail.
+The split in step 2 gives these words:
 
-The resulting matcher is a subject in the default patterns, interchangeable with common words such as `password` or `admin`. That is what makes `iamthebusinessadmin` match for a company named `Singulink Business Solutions`, and `MikeMikeLogInToSingulinkSingulink1!` match for a user named Mike on singulink.com. See [The Default Patterns](../concepts/default-patterns.md) for the patterns a subject can appear in.
+| Value | Words |
+|---|---|
+| `MikeSmith` | `mike`, `smith` |
+| `mike_smith` | `mike`, `smith` |
+| `mike1985` | `mike`, `1985` |
+| `ACMEWidgets` | `acme`, `widgets` |
+
+Each word is then matched the same way as a common word: case-insensitively, with character substitutions for words of three or more letters, with repeats, and with an optional separator after each occurrence. For a name of `Jane Doe`:
+
+```text
+janedoe       matches
+doejane       matches: any order
+jane          matches: any subset
+j4ne          matches: substitutions
+janejane      matches: a repeat
+jane.doe      matches: a separator
+jane-doe      matches
+j4ne_d0e      matches
+janedoejane   matches: the subject "jane doe", then the subject "jane"
+```
+
+Each word is used at most once within a single subject match. The last line still matches because the default patterns allow several consecutive subjects. See [How Matching Works](../concepts/how-matching-works.md) for the matching rules in detail.
+
+In the default patterns, the resulting matcher can stand wherever a subject word can, interchangeably with common words such as `password` or `admin`:
+
+```text
+Company "Singulink Business Solutions"
+  iamthebusinessadmin                   matches: "i", "am", "the", "business", "admin"
+
+Name "Mike", website "singulink.com"
+  MikeMikeLogInToSingulinkSingulink1!   matches: "mike", "mike", "login", "to", "singulink", "singulink", "1!"
+```
+
+See [Default Patterns](../concepts/default-patterns.md) for the patterns a subject can appear in.
+
+#### Short words
+
+Short words are matched too. Substitutions are not applied to words of one or two letters, though, since a lone `4` or `@` is far more likely to be a decoration than the word `a`:
+
+```text
+Name "Al"
+  al2024!   matches: "al", "2024", "!"
+  4l        no match: no substitutions in a two-letter word
+```
 
 > [!NOTE]
-> Short words are matched too. A subject of `Al` makes `al` a matchable word, so `al2024!` is rejected for that user. Substitutions are not applied to words of one or two letters, since a lone `4` or `@` is far more likely to be a decoration than the word `a`, so `4l` is not matched as the name. Since a password only matches when it consists entirely of matchable values, short subject words never cause a strong password to be rejected.
+> A password only matches when it consists entirely of matchable values, so short subject words never cause a strong password to be rejected.
 
 ## Application Subjects
 
@@ -75,11 +118,18 @@ var match = evaluator.MatchPassword(password, [
 ]);
 ```
 
-Application subjects are matched exactly like per-check subjects, as subjects in every default pattern, so `iamthewidgetproadmin` and `AcmeWidgets2024!` are rejected for every user. This is also the easiest way to add words of your own to the dictionary without touching the patterns: anything registered as a subject takes part in the sentence-like patterns and the catch-all alongside the common words. See [Customizing the Patterns](customizing-patterns.md) for when the patterns themselves need changing.
+Application subjects are matched exactly like per-check subjects, and can stand wherever a subject word can in every default pattern. With the provider above, these are rejected for every user:
+
+```text
+iamthewidgetproadmin   matches: "i", "am", "the", "widget", "pro", "admin"
+AcmeWidgets2024!       matches: "acme", "widgets", "2024", "!"
+```
+
+This is also the easiest way to add words of your own to the dictionary without touching the patterns: anything registered as a subject takes part in the sentence-like patterns and the catch-all alongside the common words. See [Adding Words and Patterns](customizing-patterns.md) for when the patterns themselves need changing.
 
 ## Customizing the Rules
 
-The provider is the extension point. The evaluator asks its <xref:Singulink.Cryptography.PasswordMatchersProvider> for matchers, and that provider asks its <xref:Singulink.Cryptography.IContextualSubjectMatcherProvider> for a matcher per subject. Replace the subject provider to change how subjects are interpreted while keeping the default patterns.
+The subject provider is the extension point. The evaluator asks its <xref:Singulink.Cryptography.PasswordMatchersProvider> for matchers, and that provider asks its <xref:Singulink.Cryptography.IContextualSubjectMatcherProvider> for one matcher per subject. To change how subjects are interpreted while keeping the default patterns, replace the subject provider.
 
 #### Changing the delimiters
 
@@ -119,7 +169,7 @@ public class MySubjectMatcherProvider : ContextualSubjectMatcherProvider
 }
 ```
 
-Return `null` for a subject that should contribute nothing. Build matchers with the factory methods on <xref:Singulink.Cryptography.PasswordMatcher>, passing <xref:Singulink.Cryptography.PasswordMatchType.ContextualSubject> as the match type so that the match reports them correctly. See [Customizing the Patterns](customizing-patterns.md) for the factory methods.
+Return `null` for a subject that should contribute nothing. Build matchers with the factory methods on <xref:Singulink.Cryptography.PasswordMatcher>, passing <xref:Singulink.Cryptography.PasswordMatchType.ContextualSubject> as the match type so that the match reports them correctly. See [Matcher Building Blocks](building-blocks.md) for the factory methods.
 
 #### Implementing the interface directly
 
@@ -129,8 +179,8 @@ Implement <xref:Singulink.Cryptography.IContextualSubjectMatcherProvider> when y
 
 Continue with these related articles:
 
-- [Match Results](match-results.md) - How contextual matches are reported.
-- [Customizing the Patterns](customizing-patterns.md) - The factory methods used to build matchers, and changing the patterns subjects appear in.
-- [The Default Patterns](../concepts/default-patterns.md) - Where a subject can appear in a matched password.
+- [Explaining a Rejection](match-results.md) - How contextual matches are reported.
+- [Adding Words and Patterns](customizing-patterns.md) - Adding words of your own, and changing the patterns subjects appear in.
+- [Default Patterns](../concepts/default-patterns.md) - Where a subject can appear in a matched password.
 
 </div>

@@ -131,7 +131,7 @@ public sealed class PasswordMatchEvaluatorTests
 
         var result = PasswordMatchEvaluator.Default.MatchPassword(password, [
             new("https://www.singulink.com", ContextualSubjectType.Website),
-            new("Mike Smith", ContextualSubjectType.Name)
+            new("Mike Smith", ContextualSubjectType.Name),
         ]);
 
         result.ShouldNotBeNull();
@@ -145,7 +145,7 @@ public sealed class PasswordMatchEvaluatorTests
 
         var result = PasswordMatchEvaluator.Default.MatchPassword(password, [
             new("https://www.singulink.com", ContextualSubjectType.Website),
-            new("Mike Smith", ContextualSubjectType.Name)
+            new("Mike Smith", ContextualSubjectType.Name),
         ]);
 
         result.ShouldNotBeNull();

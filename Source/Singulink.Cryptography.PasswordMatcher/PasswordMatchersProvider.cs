@@ -206,7 +206,7 @@ public class PasswordMatchersProvider : IPasswordMatchersProvider
             return Sequence([
                 Optional(DecorationMatcher),
                 ..matchers,
-                Optional(DecorationMatcher)
+                Optional(DecorationMatcher),
             ]);
         }
     }
